@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SCARTS-previewer</title>
+  <title>SCARTS-previewer (Multi-Format)</title>
   <style>
     body {
       font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
@@ -16,10 +16,8 @@
       flex-direction: column;
       align-items: center;
       padding-bottom: 140px;
-      /* コントローラー用の余白 */
     }
 
-    /* フォルダ選択エリア */
     .file-select-area {
       background: #333;
       padding: 15px;
@@ -31,7 +29,6 @@
       border: 2px dashed #555;
     }
 
-    /* 歌詞表示エリア */
     .lyrics-box {
       background: #111;
       border: 1px solid #444;
@@ -39,14 +36,11 @@
       width: 90%;
       max-width: 800px;
       height: 150px;
-      /* 高さ */
       overflow-y: auto;
-      /* 縦スクロール有効 */
       margin-top: 20px;
       padding: 20px;
       margin-bottom: 30px;
       white-space: pre-wrap;
-      /* 改行をそのまま表示 */
       font-size: 1rem;
       line-height: 1.8;
       color: #ddd;
@@ -54,7 +48,6 @@
       box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
     }
 
-    /* グリッドレイアウト */
     .video-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -72,7 +65,6 @@
       flex-direction: column;
     }
 
-    /* ファイル名表示 */
     .file-name-display {
       background: #333;
       color: #fff;
@@ -81,7 +73,6 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      /* 長い場合は...で省略 */
       border-bottom: 1px solid #444;
     }
 
@@ -90,6 +81,9 @@
       width: 100%;
       aspect-ratio: 16 / 9;
       background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     video {
@@ -97,18 +91,46 @@
       height: 100%;
       object-fit: contain;
       display: block;
+      position: relative;
+      z-index: 1;
     }
 
+    /* 番号表示用 */
     .placeholder-text {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
       font-size: 2rem;
       color: #555;
       font-weight: bold;
       z-index: 0;
     }
+
+    /* 音声ファイル用のアイコン表示 */
+    .audio-icon {
+      display: none;
+      /* デフォルトは非表示 */
+      position: absolute;
+      font-size: 3rem;
+      color: #4CAF50;
+      z-index: 2;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .audio-icon span {
+      font-size: 0.8rem;
+      margin-top: 5px;
+      color: #aaa;
+    }
+
+    /* クラスが付与されたらアイコンを表示し、ビデオ（黒画面）を隠す */
+    .video-wrapper.is-audio video {
+      opacity: 0;
+    }
+
+    .video-wrapper.is-audio .audio-icon {
+      display: flex;
+    }
+
 
     .audio-btn {
       width: 100%;
@@ -139,7 +161,6 @@
       background: #1a1a1a;
     }
 
-    /* フッターコントローラー */
     .main-controls {
       position: fixed;
       bottom: 0;
@@ -185,8 +206,8 @@
 <body>
 
   <div class="file-select-area">
-    <h3>STEP 1: 動画フォルダを選択</h3>
-    <p style="margin:5px 0; font-size:0.9rem; color:#aaa;">※ファイル名順に1～7番へ割り当てられます</p>
+    <h3>STEP 1: 動画・音声フォルダを選択</h3>
+    <p style="margin:5px 0; font-size:0.9rem; color:#aaa;">※ファイル名順に1～7番へ割り当てられます (mp4, mp3, wav等)</p>
     <input type="file" id="folderInput" webkitdirectory directory multiple>
   </div>
 
@@ -195,16 +216,20 @@
       // 7個分のHTML枠を生成
       for (let i = 1; i <= 7; i++) {
         document.write(`
-                    <div class="channel-box">
-                        <div class="file-name-display" id="fname${i}">No File</div>
-                        <div class="video-wrapper">
-                            <span class="placeholder-text">${i}</span>
-                            <video id="vid${i}" playsinline></video>
-                        </div>
-                        <div class="sync-status" id="status${i}">Sync: OK</div>
-                        <button class="audio-btn" id="btn${i}" onclick="toggleAudio(${i - 1})">Sound ${i}: OFF</button>
-                    </div>
-                `);
+          <div class="channel-box">
+              <div class="file-name-display" id="fname${i}">No File</div>
+              <div class="video-wrapper" id="wrap${i}">
+                  <span class="placeholder-text">${i}</span>
+                  <div class="audio-icon">
+                    🎵
+                    <span>Audio Only</span>
+                  </div>
+                  <video id="vid${i}" playsinline></video>
+              </div>
+              <div class="sync-status" id="status${i}">Sync: OK</div>
+              <button class="audio-btn" id="btn${i}" onclick="toggleAudio(${i - 1})">Sound ${i}: OFF</button>
+          </div>
+        `);
       }
     </script>
   </div>
@@ -225,6 +250,7 @@
     const btnElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`btn${i + 1}`));
     const statusElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`status${i + 1}`));
     const nameElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`fname${i + 1}`));
+    const wrapperElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`wrap${i + 1}`));
 
     const folderInput = document.getElementById('folderInput');
     const playBtn = document.getElementById('masterPlay');
@@ -251,19 +277,21 @@
       initAudioContext();
 
       const files = Array.from(e.target.files);
-      // 隠しファイルなどを除外
-      const videoFiles = files.filter(f =>
+
+      // フィルタ拡張: video系 または audio系 または 特定の拡張子
+      const mediaFiles = files.filter(f =>
         f.type.startsWith('video/') ||
-        f.name.match(/\.(mp4|mov|webm|m4v|mkv)$/i)
+        f.type.startsWith('audio/') ||
+        f.name.match(/\.(mp4|mov|webm|m4v|mkv|mp3|wav|aac|ogg)$/i)
       );
 
-      if (videoFiles.length === 0) {
-        alert("動画ファイルが見つかりませんでした。");
+      if (mediaFiles.length === 0) {
+        alert("再生可能なメディアファイル(動画/音声)が見つかりませんでした。");
         return;
       }
 
       // 名前順ソート
-      videoFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+      mediaFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
       // オーディオ設定リセット
       audioSources.forEach(src => src.disconnect());
@@ -274,9 +302,10 @@
         const vid = videoElements[i];
         const btn = btnElements[i];
         const nameLabel = nameElements[i];
+        const wrapper = wrapperElements[i];
 
-        if (videoFiles[i]) {
-          const file = videoFiles[i];
+        if (mediaFiles[i]) {
+          const file = mediaFiles[i];
           const fileURL = URL.createObjectURL(file);
 
           vid.src = fileURL;
@@ -284,8 +313,17 @@
 
           // UI更新
           vid.parentElement.querySelector('.placeholder-text').style.display = 'none';
-          nameLabel.textContent = file.name; // ファイル名を表示
-          nameLabel.title = file.name; // マウスホバーで全体表示
+          nameLabel.textContent = file.name;
+          nameLabel.title = file.name;
+
+          // 音声ファイルかどうかの判定（拡張子またはMIMEタイプ）
+          const isAudio = file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|aac|ogg)$/i);
+
+          if (isAudio) {
+            wrapper.classList.add('is-audio'); // 音符アイコンを表示
+          } else {
+            wrapper.classList.remove('is-audio'); // 通常の動画表示
+          }
 
           // Sound設定 (Web Audio API)
           const source = audioCtx.createMediaElementSource(vid);
@@ -300,13 +338,15 @@
           btn.textContent = `Sound ${i + 1}: OFF`;
           btn.classList.remove('active');
         } else {
-          // ファイルが7個未満の場合のクリア処理
+          // ファイル不足時の処理
           nameLabel.textContent = "No File";
           vid.src = "";
           vid.parentElement.querySelector('.placeholder-text').style.display = 'block';
+          wrapper.classList.remove('is-audio');
         }
       }
 
+      // マスター（1つ目）の長さ取得
       if (videoElements[0].src) {
         videoElements[0].onloadedmetadata = () => {
           masterDuration = videoElements[0].duration;
