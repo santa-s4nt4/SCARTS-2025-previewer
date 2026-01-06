@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCARTS-previewer</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      background-color: #222;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 140px;
+      /* コントローラー用の余白 */
+    }
+
+    /* フォルダ選択エリア */
+    .file-select-area {
+      background: #333;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      width: 90%;
+      max-width: 800px;
+      border: 2px dashed #555;
+    }
+
+    /* 歌詞表示エリア */
+    .lyrics-box {
+      background: #111;
+      border: 1px solid #444;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 800px;
+      height: 150px;
+      /* 高さ */
+      overflow-y: auto;
+      /* 縦スクロール有効 */
+      margin-top: 20px;
+      padding: 20px;
+      margin-bottom: 30px;
+      white-space: pre-wrap;
+      /* 改行をそのまま表示 */
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #ddd;
+      text-align: center;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* グリッドレイアウト */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 15px;
+      width: 100%;
+      max-width: 1400px;
+    }
+
+    .channel-box {
+      background: #000;
+      border: 1px solid #444;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ファイル名表示 */
+    .file-name-display {
+      background: #333;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      /* 長い場合は...で省略 */
+      border-bottom: 1px solid #444;
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #111;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .placeholder-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2rem;
+      color: #555;
+      font-weight: bold;
+      z-index: 0;
+    }
+
+    .audio-btn {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      background: #444;
+      color: #ccc;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-top: 1px solid #333;
+    }
+
+    .audio-btn:hover {
+      background: #555;
+    }
+
+    .audio-btn.active {
+      background: #4CAF50;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .sync-status {
+      font-size: 0.75rem;
+      color: #666;
+      text-align: center;
+      padding: 2px;
+      background: #1a1a1a;
+    }
+
+    /* フッターコントローラー */
+    .main-controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      padding: 15px 30px;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      z-index: 1000;
+      border-top: 1px solid #444;
+    }
+
+    button.play-btn {
+      width: 80px;
+      height: 40px;
+      cursor: pointer;
+      font-size: 1rem;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    input[type="range"] {
+      flex-grow: 1;
+      cursor: pointer;
+      height: 10px;
+    }
+
+    .time-display {
+      font-family: monospace;
+      width: 100px;
+      text-align: right;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="file-select-area">
+    <h3>STEP 1: 動画フォルダを選択</h3>
+    <p style="margin:5px 0; font-size:0.9rem; color:#aaa;">※ファイル名順に1～7番へ割り当てられます</p>
+    <input type="file" id="folderInput" webkitdirectory directory multiple>
+  </div>
+
+  <div class="video-grid">
+    <script>
+      // 7個分のHTML枠を生成
+      for (let i = 1; i <= 7; i++) {
+        document.write(`
+                    <div class="channel-box">
+                        <div class="file-name-display" id="fname${i}">No File</div>
+                        <div class="video-wrapper">
+                            <span class="placeholder-text">${i}</span>
+                            <video id="vid${i}" playsinline></video>
+                        </div>
+                        <div class="sync-status" id="status${i}">Sync: OK</div>
+                        <button class="audio-btn" id="btn${i}" onclick="toggleAudio(${i - 1})">Sound ${i}: OFF</button>
+                    </div>
+                `);
+      }
+    </script>
+  </div>
+
+  <div class="main-controls">
+    <button class="play-btn" id="masterPlay">Play</button>
+    <input type="range" id="masterSeek" value="0" min="0" step="0.1">
+    <span class="time-display" id="timeDisplay">00:00</span>
+  </div>
+
+  <div class="lyrics-box">
+    Lyrics(ここに歌詞が入ります)
+  </div>
+
+  <script>
+    // 要素取得
+    const videoElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`vid${i + 1}`));
+    const btnElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`btn${i + 1}`));
+    const statusElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`status${i + 1}`));
+    const nameElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`fname${i + 1}`));
+
+    const folderInput = document.getElementById('folderInput');
+    const playBtn = document.getElementById('masterPlay');
+    const seek = document.getElementById('masterSeek');
+    const timeDisplay = document.getElementById('timeDisplay');
+
+    let audioCtx;
+    const gainNodes = [];
+    let audioSources = [];
+    let isPlaying = false;
+    let masterDuration = 0;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    folderInput.addEventListener('change', async (e) => {
+      initAudioContext();
+
+      const files = Array.from(e.target.files);
+      // 隠しファイルなどを除外
+      const videoFiles = files.filter(f =>
+        f.type.startsWith('video/') ||
+        f.name.match(/\.(mp4|mov|webm|m4v|mkv)$/i)
+      );
+
+      if (videoFiles.length === 0) {
+        alert("動画ファイルが見つかりませんでした。");
+        return;
+      }
+
+      // 名前順ソート
+      videoFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+      // オーディオ設定リセット
+      audioSources.forEach(src => src.disconnect());
+      audioSources = [];
+      gainNodes.length = 0;
+
+      for (let i = 0; i < 7; i++) {
+        const vid = videoElements[i];
+        const btn = btnElements[i];
+        const nameLabel = nameElements[i];
+
+        if (videoFiles[i]) {
+          const file = videoFiles[i];
+          const fileURL = URL.createObjectURL(file);
+
+          vid.src = fileURL;
+          vid.load();
+
+          // UI更新
+          vid.parentElement.querySelector('.placeholder-text').style.display = 'none';
+          nameLabel.textContent = file.name; // ファイル名を表示
+          nameLabel.title = file.name; // マウスホバーで全体表示
+
+          // Sound設定 (Web Audio API)
+          const source = audioCtx.createMediaElementSource(vid);
+          audioSources.push(source);
+
+          const gainNode = audioCtx.createGain();
+          gainNode.gain.value = 0;
+          gainNodes.push(gainNode);
+
+          source.connect(gainNode).connect(audioCtx.destination);
+
+          btn.textContent = `Sound ${i + 1}: OFF`;
+          btn.classList.remove('active');
+        } else {
+          // ファイルが7個未満の場合のクリア処理
+          nameLabel.textContent = "No File";
+          vid.src = "";
+          vid.parentElement.querySelector('.placeholder-text').style.display = 'block';
+        }
+      }
+
+      if (videoElements[0].src) {
+        videoElements[0].onloadedmetadata = () => {
+          masterDuration = videoElements[0].duration;
+          seek.max = masterDuration;
+        };
+      }
+    });
+
+    window.toggleAudio = function (index) {
+      if (!gainNodes[index]) return;
+      initAudioContext();
+
+      const currentGain = gainNodes[index].gain.value;
+      const btn = btnElements[index];
+
+      if (currentGain === 0) {
+        gainNodes[index].gain.setTargetAtTime(1, audioCtx.currentTime, 0.1);
+        btn.classList.add('active');
+        btn.textContent = `Sound ${index + 1}: ON`;
+      } else {
+        gainNodes[index].gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        btn.classList.remove('active');
+        btn.textContent = `Sound ${index + 1}: OFF`;
+      }
+    };
+
+    playBtn.addEventListener('click', () => {
+      initAudioContext();
+      if (isPlaying) {
+        videoElements.forEach(v => { if (v.src) v.pause(); });
+        playBtn.textContent = "Play";
+      } else {
+        videoElements.forEach(v => { if (v.src) v.play(); });
+        playBtn.textContent = "Pause";
+      }
+      isPlaying = !isPlaying;
+    });
+
+    seek.addEventListener('input', (e) => {
+      const time = parseFloat(e.target.value);
+      videoElements.forEach(v => {
+        if (v.src) {
+          v.currentTime = time;
+          v.playbackRate = 1.0;
+        }
+      });
+      updateTimeDisplay(time);
+    });
+
+    videoElements[0].addEventListener('timeupdate', () => {
+      if (!seek.matches(':active') && videoElements[0].duration) {
+        seek.value = videoElements[0].currentTime;
+        updateTimeDisplay(videoElements[0].currentTime);
+      }
+    });
+
+    function updateTimeDisplay(time) {
+      if (isNaN(time)) time = 0;
+      const m = Math.floor(time / 60).toString().padStart(2, '0');
+      const s = Math.floor(time % 60).toString().padStart(2, '0');
+      timeDisplay.textContent = `${m}:${s}`;
+    }
+
+    // ピッチベンド同期（音飛び防止）
+    setInterval(() => {
+      if (!isPlaying || !videoElements[0].src) return;
+      const masterTime = videoElements[0].currentTime;
+
+      videoElements.forEach((v, i) => {
+        if (i === 0 || !v.src) return;
+
+        const diff = v.currentTime - masterTime;
+        const statusEl = statusElements[i];
+
+        if (Math.abs(diff) < 0.05) {
+          v.playbackRate = 1.0;
+          statusEl.textContent = "Sync: Perfect";
+          statusEl.style.color = "#888";
+        } else if (Math.abs(diff) > 0.5) {
+          v.currentTime = masterTime;
+          statusEl.textContent = "Sync: JUMP";
+          statusEl.style.color = "red";
+        } else {
+          v.playbackRate = diff < 0 ? 1.05 : 0.95;
+          statusEl.textContent = `Sync: ${diff < 0 ? "Catching up" : "Waiting"}`;
+          statusEl.style.color = "orange";
+        }
+      });
+    }, 500);
+  </script>
+</body>
+
+</html>
