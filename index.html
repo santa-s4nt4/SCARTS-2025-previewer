@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SCARTS-previewer (Multi-Format)</title>
+  <title>SCARTS-previewer (Volume Control)</title>
   <style>
     body {
       font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
@@ -95,7 +95,6 @@
       z-index: 1;
     }
 
-    /* 番号表示用 */
     .placeholder-text {
       position: absolute;
       font-size: 2rem;
@@ -104,10 +103,8 @@
       z-index: 0;
     }
 
-    /* 音声ファイル用のアイコン表示 */
     .audio-icon {
       display: none;
-      /* デフォルトは非表示 */
       position: absolute;
       font-size: 3rem;
       color: #4CAF50;
@@ -122,7 +119,6 @@
       color: #aaa;
     }
 
-    /* クラスが付与されたらアイコンを表示し、ビデオ（黒画面）を隠す */
     .video-wrapper.is-audio video {
       opacity: 0;
     }
@@ -131,26 +127,43 @@
       display: flex;
     }
 
+    /* コントロールエリアのレイアウト変更 */
+    .controls-row {
+      display: flex;
+      align-items: center;
+      background: #444;
+      border-top: 1px solid #333;
+      padding: 5px 10px;
+      gap: 10px;
+    }
 
     .audio-btn {
-      width: 100%;
-      padding: 10px;
+      flex-grow: 1;
+      /* ボタンを広げる */
+      padding: 8px;
       border: none;
-      background: #444;
+      background: #555;
       color: #ccc;
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       cursor: pointer;
-      border-top: 1px solid #333;
+      border-radius: 4px;
+      transition: background 0.2s;
     }
 
     .audio-btn:hover {
-      background: #555;
+      background: #666;
     }
 
     .audio-btn.active {
       background: #4CAF50;
       color: #fff;
       font-weight: bold;
+    }
+
+    /* ボリュームスライダー */
+    .vol-slider {
+      width: 80px;
+      cursor: pointer;
     }
 
     .sync-status {
@@ -189,8 +202,12 @@
     }
 
     input[type="range"] {
-      flex-grow: 1;
       cursor: pointer;
+    }
+
+    /* メインシークバーは大きく */
+    #masterSeek {
+      flex-grow: 1;
       height: 10px;
     }
 
@@ -213,7 +230,7 @@
 
   <div class="video-grid">
     <script>
-      // 7個分のHTML枠を生成
+      // 7個分のHTML枠を生成（スライダー追加）
       for (let i = 1; i <= 7; i++) {
         document.write(`
           <div class="channel-box">
@@ -227,7 +244,10 @@
                   <video id="vid${i}" playsinline></video>
               </div>
               <div class="sync-status" id="status${i}">Sync: OK</div>
-              <button class="audio-btn" id="btn${i}" onclick="toggleAudio(${i - 1})">Sound ${i}: OFF</button>
+              <div class="controls-row">
+                  <button class="audio-btn" id="btn${i}" onclick="toggleAudio(${i - 1})">OFF</button>
+                  <input type="range" class="vol-slider" id="vol${i}" min="0" max="1" step="0.01" value="1" oninput="changeVolume(${i - 1}, this.value)">
+              </div>
           </div>
         `);
       }
@@ -248,6 +268,7 @@
     // 要素取得
     const videoElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`vid${i + 1}`));
     const btnElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`btn${i + 1}`));
+    const volElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`vol${i + 1}`));
     const statusElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`status${i + 1}`));
     const nameElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`fname${i + 1}`));
     const wrapperElements = Array.from({ length: 7 }, (_, i) => document.getElementById(`wrap${i + 1}`));
@@ -260,6 +281,10 @@
     let audioCtx;
     const gainNodes = [];
     let audioSources = [];
+
+    // 各チャンネルの状態管理 (volume: スライダーの値, muted: ボタンの状態)
+    const channelStates = Array.from({ length: 7 }, () => ({ volume: 1.0, muted: true }));
+
     let isPlaying = false;
     let masterDuration = 0;
 
@@ -277,8 +302,6 @@
       initAudioContext();
 
       const files = Array.from(e.target.files);
-
-      // フィルタ拡張: video系 または audio系 または 特定の拡張子
       const mediaFiles = files.filter(f =>
         f.type.startsWith('video/') ||
         f.type.startsWith('audio/') ||
@@ -290,10 +313,9 @@
         return;
       }
 
-      // 名前順ソート
       mediaFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
-      // オーディオ設定リセット
+      // リセット
       audioSources.forEach(src => src.disconnect());
       audioSources = [];
       gainNodes.length = 0;
@@ -301,8 +323,16 @@
       for (let i = 0; i < 7; i++) {
         const vid = videoElements[i];
         const btn = btnElements[i];
+        const vol = volElements[i];
         const nameLabel = nameElements[i];
         const wrapper = wrapperElements[i];
+
+        // 状態初期化
+        channelStates[i].muted = true;
+        channelStates[i].volume = 1.0;
+        vol.value = 1.0; // スライダーを最大に戻す
+        btn.textContent = "OFF";
+        btn.classList.remove('active');
 
         if (mediaFiles[i]) {
           const file = mediaFiles[i];
@@ -311,42 +341,34 @@
           vid.src = fileURL;
           vid.load();
 
-          // UI更新
           vid.parentElement.querySelector('.placeholder-text').style.display = 'none';
           nameLabel.textContent = file.name;
           nameLabel.title = file.name;
 
-          // 音声ファイルかどうかの判定（拡張子またはMIMEタイプ）
           const isAudio = file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|aac|ogg)$/i);
+          if (isAudio) wrapper.classList.add('is-audio');
+          else wrapper.classList.remove('is-audio');
 
-          if (isAudio) {
-            wrapper.classList.add('is-audio'); // 音符アイコンを表示
-          } else {
-            wrapper.classList.remove('is-audio'); // 通常の動画表示
-          }
-
-          // Sound設定 (Web Audio API)
+          // Audio Node 設定
           const source = audioCtx.createMediaElementSource(vid);
           audioSources.push(source);
 
           const gainNode = audioCtx.createGain();
-          gainNode.gain.value = 0;
+          gainNode.gain.value = 0; // 初期状態はミュート
           gainNodes.push(gainNode);
 
           source.connect(gainNode).connect(audioCtx.destination);
-
-          btn.textContent = `Sound ${i + 1}: OFF`;
-          btn.classList.remove('active');
         } else {
-          // ファイル不足時の処理
           nameLabel.textContent = "No File";
           vid.src = "";
           vid.parentElement.querySelector('.placeholder-text').style.display = 'block';
           wrapper.classList.remove('is-audio');
+          // ダミーのGainNodeを入れて配列のインデックスずれを防ぐ（念の為）
+          const dummyGain = audioCtx.createGain();
+          gainNodes.push(dummyGain);
         }
       }
 
-      // マスター（1つ目）の長さ取得
       if (videoElements[0].src) {
         videoElements[0].onloadedmetadata = () => {
           masterDuration = videoElements[0].duration;
@@ -355,21 +377,41 @@
       }
     });
 
+    // --- 音量変更 (スライダー操作) ---
+    window.changeVolume = function (index, value) {
+      if (!gainNodes[index]) return;
+      initAudioContext();
+
+      const floatVal = parseFloat(value);
+      channelStates[index].volume = floatVal; // 設定値を記憶
+
+      // ミュート中でなければ、即座に音量を反映
+      if (!channelStates[index].muted) {
+        // フェードなしで即時反映（スライダー操作の追従性を良くするため）
+        gainNodes[index].gain.setTargetAtTime(floatVal, audioCtx.currentTime, 0.01);
+      }
+    };
+
+    // --- ON/OFF 切替 (ボタン操作) ---
     window.toggleAudio = function (index) {
       if (!gainNodes[index]) return;
       initAudioContext();
 
-      const currentGain = gainNodes[index].gain.value;
       const btn = btnElements[index];
+      const state = channelStates[index];
 
-      if (currentGain === 0) {
-        gainNodes[index].gain.setTargetAtTime(1, audioCtx.currentTime, 0.1);
+      if (state.muted) {
+        // 音声をONにする（スライダーの値までフェードイン）
+        state.muted = false;
+        gainNodes[index].gain.setTargetAtTime(state.volume, audioCtx.currentTime, 0.1);
         btn.classList.add('active');
-        btn.textContent = `Sound ${index + 1}: ON`;
+        btn.textContent = "ON";
       } else {
+        // 音声をOFFにする（0までフェードアウト）
+        state.muted = true;
         gainNodes[index].gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
         btn.classList.remove('active');
-        btn.textContent = `Sound ${index + 1}: OFF`;
+        btn.textContent = "OFF";
       }
     };
 
@@ -410,7 +452,7 @@
       timeDisplay.textContent = `${m}:${s}`;
     }
 
-    // ピッチベンド同期（音飛び防止）
+    // 同期処理
     setInterval(() => {
       if (!isPlaying || !videoElements[0].src) return;
       const masterTime = videoElements[0].currentTime;
