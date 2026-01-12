@@ -4,76 +4,127 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SCARTS-previewer (Volume Control)</title>
+  <title>SCARTS-previewer</title>
   <style>
+    /* --- Font Import (from style.css) --- */
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@100;300;400;700&family=Noto+Sans+JP:wght@100;300;400&display=swap');
+
+    /* --- Base Styles --- */
     body {
-      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-      background-color: #222;
-      color: #fff;
       margin: 0;
-      padding: 20px;
+      /* 横幅を有効活用するため余白を減らす */
+      padding: 10px;
+      /* 指定のブルー */
+      background-color: #1c1bd8;
+      color: #fff;
+      font-family: "Noto Sans", "Noto Sans JP", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-weight: 100;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding-bottom: 140px;
+      min-height: 100vh;
+      box-sizing: border-box;
+      overflow-x: hidden;
+      /* 横スクロール防止 */
     }
 
+    h3 {
+      font-weight: 100;
+      letter-spacing: 0.15em;
+      margin: 0 0 10px 0;
+    }
+
+    p {
+      font-weight: 300;
+      letter-spacing: 0.05em;
+    }
+
+    /* --- File Select Area --- */
     .file-select-area {
-      background: #333;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 20px;
+      border-radius: 2px;
+      margin-bottom: 30px;
       text-align: center;
-      width: 90%;
-      max-width: 800px;
-      border: 2px dashed #555;
+      width: 95%;
+      /* 幅を広げる */
+      max-width: 1200px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      margin-top: 20px;
     }
 
+    /* --- Lyrics Box --- */
     .lyrics-box {
-      background: #111;
-      border: 1px solid #444;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 800px;
+      background: transparent;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      width: 95%;
+      /* 幅を広げる */
+      max-width: 1200px;
       height: 150px;
       overflow-y: auto;
-      margin-top: 20px;
-      padding: 20px;
+      margin-top: 10px;
+      padding: 20px 0;
       margin-bottom: 30px;
       white-space: pre-wrap;
       font-size: 1rem;
       line-height: 1.8;
-      color: #ddd;
+      color: rgba(255, 255, 255, 0.9);
       text-align: center;
-      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
     }
 
+    .lyrics-box::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .lyrics-box::-webkit-scrollbar-thumb {
+      background-color: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    /* --- Video Grid (ここを大きく変更) --- */
     .video-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 15px;
-      width: 100%;
-      max-width: 1400px;
+      /* 最小幅を480pxに拡大して、一つ一つを大きく表示 */
+      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+      gap: 20px;
+      width: 98%;
+      /* ほぼ全幅 */
+      max-width: 100%;
+      /* 制限解除 */
     }
 
     .channel-box {
       background: #000;
-      border: 1px solid #444;
-      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      transition: border-color 0.3s;
+    }
+
+    .channel-box:hover {
+      border-color: rgba(255, 255, 255, 0.8);
     }
 
     .file-name-display {
-      background: #333;
+      background: rgba(255, 255, 255, 0.1);
       color: #fff;
-      font-size: 0.8rem;
-      padding: 4px 8px;
+      font-size: 0.85rem;
+      padding: 8px 12px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      border-bottom: 1px solid #444;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      font-weight: 300;
+      letter-spacing: 0.05em;
     }
 
     .video-wrapper {
@@ -97,26 +148,30 @@
 
     .placeholder-text {
       position: absolute;
-      font-size: 2rem;
-      color: #555;
-      font-weight: bold;
+      font-size: 3rem;
+      /* 文字も大きく */
+      color: rgba(255, 255, 255, 0.2);
+      font-weight: 100;
       z-index: 0;
     }
 
     .audio-icon {
       display: none;
       position: absolute;
-      font-size: 3rem;
-      color: #4CAF50;
+      font-size: 4rem;
+      /* アイコンも大きく */
+      color: rgba(255, 255, 255, 0.8);
       z-index: 2;
       flex-direction: column;
       align-items: center;
+      font-weight: 100;
     }
 
     .audio-icon span {
-      font-size: 0.8rem;
-      margin-top: 5px;
-      color: #aaa;
+      font-size: 1rem;
+      margin-top: 10px;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.1em;
     }
 
     .video-wrapper.is-audio video {
@@ -127,95 +182,137 @@
       display: flex;
     }
 
-    /* コントロールエリアのレイアウト変更 */
+    /* --- Individual Controls --- */
     .controls-row {
       display: flex;
       align-items: center;
-      background: #444;
-      border-top: 1px solid #333;
-      padding: 5px 10px;
-      gap: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 15px;
+      gap: 15px;
     }
 
     .audio-btn {
       flex-grow: 1;
-      /* ボタンを広げる */
-      padding: 8px;
-      border: none;
-      background: #555;
-      color: #ccc;
-      font-size: 0.8rem;
+      padding: 6px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      background: transparent;
+      color: rgba(255, 255, 255, 0.6);
+      font-family: "Noto Sans", sans-serif;
+      font-size: 0.85rem;
       cursor: pointer;
-      border-radius: 4px;
-      transition: background 0.2s;
+      border-radius: 2px;
+      transition: all 0.3s;
+      font-weight: 300;
+      letter-spacing: 0.1em;
     }
 
     .audio-btn:hover {
-      background: #666;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border-color: #fff;
     }
 
     .audio-btn.active {
-      background: #4CAF50;
-      color: #fff;
-      font-weight: bold;
+      background: #fff;
+      color: #1c1bd8;
+      border-color: #fff;
+      font-weight: 400;
     }
 
     /* ボリュームスライダー */
     .vol-slider {
-      width: 80px;
+      width: 100px;
+      /* 少し長く */
+      cursor: pointer;
+      height: 3px;
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 1px;
+    }
+
+    .vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
       cursor: pointer;
     }
 
     .sync-status {
-      font-size: 0.75rem;
-      color: #666;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
       text-align: center;
-      padding: 2px;
-      background: #1a1a1a;
+      padding: 3px;
+      background: #000;
+      letter-spacing: 0.05em;
     }
 
+    /* --- Main Controls (Footer) --- */
     .main-controls {
       position: fixed;
       bottom: 0;
       left: 0;
       width: 100%;
-      background: rgba(0, 0, 0, 0.95);
-      padding: 15px 30px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(5px);
+      padding: 20px 40px;
       box-sizing: border-box;
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 30px;
       z-index: 1000;
-      border-top: 1px solid #444;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     button.play-btn {
-      width: 80px;
-      height: 40px;
+      width: 120px;
+      height: 50px;
       cursor: pointer;
-      font-size: 1rem;
-      background: #fff;
-      color: #000;
-      border: none;
-      border-radius: 4px;
-      font-weight: bold;
+      font-size: 1.2rem;
+      background: transparent;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 2px;
+      font-family: "Noto Sans", sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.15em;
+      transition: all 0.3s;
+    }
+
+    button.play-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #fff;
     }
 
     input[type="range"] {
       cursor: pointer;
     }
 
-    /* メインシークバーは大きく */
     #masterSeek {
       flex-grow: 1;
-      height: 10px;
+      height: 4px;
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    #masterSeek::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
     }
 
     .time-display {
-      font-family: monospace;
+      font-family: "Noto Sans", monospace;
       width: 100px;
       text-align: right;
       font-size: 1.2rem;
+      font-weight: 300;
+      letter-spacing: 0.05em;
     }
   </style>
 </head>
@@ -223,14 +320,16 @@
 <body>
 
   <div class="file-select-area">
-    <h3>STEP 1: 動画・音声フォルダを選択</h3>
-    <p style="margin:5px 0; font-size:0.9rem; color:#aaa;">※ファイル名順に1～7番へ割り当てられます (mp4, mp3, wav等)</p>
-    <input type="file" id="folderInput" webkitdirectory directory multiple>
+    <h3>STEP 1</h3>
+    <p style="margin:5px 0; font-size:1rem; color:rgba(255,255,255,0.7);">動画・音声フォルダを選択してください<br><span
+        style="font-size:0.85rem; opacity:0.6;">※ファイル名順に1～7番へ割り当てられます (mp4, mp3, wav等)</span></p>
+    <input type="file" id="folderInput" webkitdirectory directory multiple
+      style="margin-top:15px; font-family:'Noto Sans'; font-size:1rem;">
   </div>
 
   <div class="video-grid">
     <script>
-      // 7個分のHTML枠を生成（スライダー追加）
+      // 7個分のHTML枠を生成
       for (let i = 1; i <= 7; i++) {
         document.write(`
           <div class="channel-box">
@@ -261,39 +360,22 @@
   </div>
 
   <div class="lyrics-box">
-    "さらのうえににくわ",
-    "あるのにわたしの",
-    "にくたいのさらわ",
-    "ないことわざーー",
-    "みたいでもだれも",
-    "うなずかないーー",
-    "ねんきんわにくの",
-    "うえをとおりーー",
-    "せかいをおぼえる",
-    "ぞるげるかたいー",
-    "げるひやりまたー",
-    "あついかくえきー",
-    "ていしゃでんしゃーー",
-    "ひやあせーーーー",
-    "おかあさんわにく",
-    "をふやすふあんの",
-    "てしいくこやでー",
-    "りんかくがとけー",
-    "わたしがまざるー",
-    "ちゃいろいかたまり",
-    "うんこかだんごか",
-    "しゃーれにぽつりー",
-    "おとのないにくうそとーー",
-    "ほんとうのふだゆれる",
-    "かまれぬにくーー",
-    "ねむらぬにくーー",
-    "ねんきんのあとー",
-    "だけしょうめいーー",
-    "みたいにのこるいれの",
-    "わたしようにさら",
-    "をかかえすくなくー",
-    "てもいきるーーー",
-    "せいめい"
+    皿のうえに肉はあるのに
+    わたしの肉体の皿はない
+    ことわざみたい
+    でもだれも　うなずかない
+    粘菌は肉のうえを通り
+    世界をうんどうでおぼえる
+    ぞるげる　かたいげる
+    ひやり　またあつい
+    各駅停車　冷や汗
+    お母さんは肉を増やす　不安の手
+    飼育小屋で輪郭がとけ　わたしがまざる
+    茶色い塊　うんこか団子か
+    シャーレにぽつり　音のない肉
+    うそとほんとうの札　ゆれる
+    噛まれぬ肉　眠らぬ肉
+    粘菌のあとだけ　証明みたいにのこる
   </div>
 
   <script>
@@ -498,15 +580,15 @@
         if (Math.abs(diff) < 0.05) {
           v.playbackRate = 1.0;
           statusEl.textContent = "Sync: Perfect";
-          statusEl.style.color = "#888";
+          statusEl.style.color = "rgba(255,255,255,0.5)";
         } else if (Math.abs(diff) > 0.5) {
           v.currentTime = masterTime;
           statusEl.textContent = "Sync: JUMP";
-          statusEl.style.color = "red";
+          statusEl.style.color = "#ff4444";
         } else {
           v.playbackRate = diff < 0 ? 1.05 : 0.95;
           statusEl.textContent = `Sync: ${diff < 0 ? "Catching up" : "Waiting"}`;
-          statusEl.style.color = "orange";
+          statusEl.style.color = "#ffbb33";
         }
       });
     }, 500);
